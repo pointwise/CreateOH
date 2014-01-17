@@ -9,7 +9,7 @@
 
 #############################################################################
 ##
-## createOH.glf
+## CreateOH.glf
 ##
 ## CREATE OH TOPOLOGY FROM FOUR SELECTED CONNECTORS
 ## 
