@@ -420,8 +420,8 @@ pw::Script loadTk
 set infoMessage ""
 set pickedCons -1
 
-set color(Valid)   SystemWindow
-set color(Invalid) MistyRose
+set color(Valid)   "white"
+set color(Invalid) "misty rose"
 
 set w(LabelTitle)           .title
 set w(FrameMain)          .main
@@ -544,7 +544,7 @@ ZShAUfVa3Bz/EpQ70oWJC2mAKDmwEHYAIxhikAQPeOCLdRTEAhGIQKL0IMoGTGMgIBClA9QxkA3U
 
 # Build the user interface
 proc makeWindow { } {
-  global w input
+  global w input color
 
   # Ceate the widgets
   label $w(LabelTitle) -text "Create OH\nInput Parameters"
@@ -556,10 +556,12 @@ proc makeWindow { } {
 
   label $w(LabelDimension) -text "Radial dimension:" -anchor e
   entry $w(EntryDimension) -width 6 -bd 2 -textvariable input(sDim)
+  $w(EntryDimension) configure -background $color(Valid)
   $w(EntryDimension) configure -state disabled
 
   label $w(LabelExtent) -text "Radial extent:" -padx 2 -anchor e
   entry $w(EntryExtent) -width 10 -bd 2 -textvariable input(alpha)
+  $w(EntryExtent) configure -background $color(Valid)
   $w(EntryExtent) configure -state disabled
 
   label $w(LabelSolve) -text "Run solver?" -padx 2 -anchor e
