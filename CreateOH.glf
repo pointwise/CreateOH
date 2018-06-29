@@ -1,5 +1,5 @@
 #
-# Copyright 2014 (c) Pointwise, Inc.
+# Copyright 2018 (c) Pointwise, Inc.
 # All rights reserved.
 #
 # This sample Pointwise script is not supported by Pointwise, Inc.
@@ -341,16 +341,43 @@ proc selectCons {} {
     if {$curSelection(nodes) == -1} {
         puts "No loop present, please select a closed loop of 4 connectors."
         set infoMessage "Invalid loop, press Pick Connectors"
-        wm deiconify .
     } else {
-        wm deiconify .
         set pickedCons 1
         $w(EntryDimension) configure -state normal
         $w(EntryExtent) configure -state normal
         $w(EntrySolve) configure -state normal
         updateButtons
     }
+    wm deiconify .
 }
+
+# PROC: retrieveCons
+# Proc to attempt to retrieve selected connectors if applicable 
+proc retrieveCons {} {
+    global pickedCons curSelection infoMessage
+
+    set picked [pw::Display getSelectedEntities curSelection]
+    set N_con [llength $curSelection(Connectors)]
+
+    if { $picked && $N_con == 4 } {
+        set temp [isLoop $curSelection(Connectors)]
+        set curSelection(nodes) [lindex $temp 0]
+        set curSelection(cons) [lindex $temp 1]
+
+        if {$curSelection(nodes) == -1} {
+            puts "No loop present, please select a closed loop of 4 connectors."
+            set infoMessage "Invalid loop, press Pick Connectors"
+        } else {
+            set pickedCons 1
+            return true
+        }
+    } elseif $picked {
+        puts "No loop present, please select a closed loop of 4 connectors."
+        set infoMessage "Invalid loop, press Pick Connectors"
+    }
+    return false
+}
+
 
 ## Process called by TK widget to create topology
 proc createOH {} {
@@ -466,9 +493,9 @@ proc validateAlpha { alpha widget } {
 proc canCreate { } {
   global w color pickedCons
   return [expr \
-    [string equal -nocase [$w(EntryDimension) cget -background] $color(Valid)] \
-        && [string equal -nocase [$w(EntryExtent) cget -background] \
-        $color(Valid)] && $pickedCons==1]
+    [string equal -nocase [$w(EntryDimension) cget -background] $color(Valid)] && \
+    [string equal -nocase [$w(EntryExtent) cget -background] $color(Valid)] && \
+    $pickedCons == 1]
 }
 
 # enable/disable action buttons based on current settings
@@ -495,6 +522,91 @@ proc setTitleFont { l } {
         -weight bold -size [expr {int(1.5 * $fontSize)}]]
   }
   $l configure -font $titleFont
+}
+
+# Build the user interface
+proc makeWindow { haveSelection } {
+  global w input color
+
+  # Ceate the widgets
+  label $w(LabelTitle) -text "Create OH\nInput Parameters"
+  setTitleFont $w(LabelTitle)
+
+  frame $w(FrameMain)
+
+  button $w(ButtonSelect) -text "Pick Connectors" -command { selectCons }
+
+  label $w(LabelDimension) -text "Radial dimension:" -anchor e
+  entry $w(EntryDimension) -width 6 -bd 2 -textvariable input(sDim)
+  $w(EntryDimension) configure -background $color(Valid)
+
+  label $w(LabelExtent) -text "Radial extent:" -padx 2 -anchor e
+  entry $w(EntryExtent) -width 10 -bd 2 -textvariable input(alpha)
+  $w(EntryExtent) configure -background $color(Valid)
+
+  label $w(LabelSolve) -text "Run solver?" -padx 2 -anchor e
+  checkbutton $w(EntrySolve) -variable input(solveGrid)
+  
+  button $w(ButtoncOH) -text "Create OH" -command { createOH }
+
+  message $w(Message) -textvariable infoMessage -background beige \
+                      -bd 2 -relief sunken -padx 5 -pady 5 -anchor w \
+                      -justify left -width 300
+
+  frame $w(FrameButtons) -relief sunken
+
+  button $w(ButtonCancel) -text "Cancel" -command { destroy . }
+  label $w(Logo) -image [pwLogo] -bd 0 -relief flat
+
+  # set up validation after all widgets are created so that they all exist when
+  # validation fires the first time; if they don't all exist, updateButtons
+  # will fail
+  $w(EntryDimension) configure -validate key \
+    -vcmd { validateDim %P EntryDimension }
+  $w(EntryExtent) configure -validate key \
+    -vcmd { validateAlpha %P EntryExtent }
+
+  # lay out the form
+  pack $w(LabelTitle) -side top
+  pack [frame .sp -bd 1 -height 2 -relief sunken] -pady 4 -side top -fill x
+  pack $w(FrameMain) -side top -fill both -expand 1
+
+  # lay out the form in a grid
+  grid $w(ButtonSelect) -columnspan 2 -pady 3
+  grid $w(LabelDimension) $w(EntryDimension) -sticky ew -pady 3 -padx 3
+  grid $w(LabelExtent) $w(EntryExtent) -sticky ew -pady 3 -padx 3
+  grid $w(LabelSolve) $w(EntrySolve) -sticky ew -pady 3 -padx 3
+  grid $w(ButtoncOH) -columnspan 2 -pady 3
+
+  # give all extra space to the second (last) column
+  grid columnconfigure $w(FrameMain) 1 -weight 1
+
+  pack $w(Message) -side bottom -fill x -anchor s
+  pack $w(FrameButtons) -fill x -side bottom -padx 2 -pady 4 -anchor s
+  pack $w(ButtonCancel) -side right -padx 2
+  pack $w(Logo) -side left -padx 5
+
+  bind . <Key-Escape> { $w(ButtonCancel) invoke }
+  bind . <Control-Key-Return> { $w(ButtonSelect) invoke }
+  bind . <Control-Key-f> { $w(ButtoncOH) invoke }
+  bind $w(EntryExtent) <Key-Return> { $w(ButtoncOH) invoke }
+
+  # move keyboard focus to the first entry
+  focus $w(ButtonSelect)
+  raise .
+
+  if { $haveSelection } {
+    $w(EntryDimension) configure -state normal
+    $w(EntryExtent) configure -state normal
+    $w(EntrySolve) configure -state normal
+    $w(ButtoncOH) configure -state normal
+    updateButtons
+  } else {
+    $w(EntryDimension) configure -state disabled
+    $w(EntryExtent) configure -state disabled
+    $w(EntrySolve) configure -state disabled
+    $w(ButtoncOH) configure -state disabled
+  }
 }
 
 ###############################################################################
@@ -542,83 +654,7 @@ ZShAUfVa3Bz/EpQ70oWJC2mAKDmwEHYAIxhikAQPeOCLdRTEAhGIQKL0IMoGTGMgIBClA9QxkA3U
   return [image create photo -format GIF -data $logoData]
 }
 
-# Build the user interface
-proc makeWindow { } {
-  global w input color
-
-  # Ceate the widgets
-  label $w(LabelTitle) -text "Create OH\nInput Parameters"
-  setTitleFont $w(LabelTitle)
-
-  frame $w(FrameMain)
-
-  button $w(ButtonSelect) -text "Pick Connectors" -command { selectCons }
-
-  label $w(LabelDimension) -text "Radial dimension:" -anchor e
-  entry $w(EntryDimension) -width 6 -bd 2 -textvariable input(sDim)
-  $w(EntryDimension) configure -background $color(Valid)
-  $w(EntryDimension) configure -state disabled
-
-  label $w(LabelExtent) -text "Radial extent:" -padx 2 -anchor e
-  entry $w(EntryExtent) -width 10 -bd 2 -textvariable input(alpha)
-  $w(EntryExtent) configure -background $color(Valid)
-  $w(EntryExtent) configure -state disabled
-
-  label $w(LabelSolve) -text "Run solver?" -padx 2 -anchor e
-  checkbutton $w(EntrySolve) -variable input(solveGrid)
-  $w(EntrySolve) configure -state disabled
-  
-  button $w(ButtoncOH) -text "Create OH" -command { createOH }
-  $w(ButtoncOH) configure -state disabled
-
-  message $w(Message) -textvariable infoMessage -background beige \
-                      -bd 2 -relief sunken -padx 5 -pady 5 -anchor w \
-                      -justify left -width 300
-
-  frame $w(FrameButtons) -relief sunken
-
-  button $w(ButtonCancel) -text "Cancel" -command { destroy . }
-  label $w(Logo) -image [pwLogo] -bd 0 -relief flat
-
-  # set up validation after all widgets are created so that they all exist when
-  # validation fires the first time; if they don't all exist, updateButtons
-  # will fail
-  $w(EntryDimension) configure -validate key \
-    -vcmd { validateDim %P EntryDimension }
-  $w(EntryExtent) configure -validate key \
-    -vcmd { validateAlpha %P EntryExtent }
-
-  # lay out the form
-  pack $w(LabelTitle) -side top
-  pack [frame .sp -bd 1 -height 2 -relief sunken] -pady 4 -side top -fill x
-  pack $w(FrameMain) -side top -fill both -expand 1
-
-  # lay out the form in a grid
-  grid $w(ButtonSelect) -columnspan 2 -pady 3
-  grid $w(LabelDimension) $w(EntryDimension) -sticky ew -pady 3 -padx 3
-  grid $w(LabelExtent) $w(EntryExtent) -sticky ew -pady 3 -padx 3
-  grid $w(LabelSolve) $w(EntrySolve) -sticky ew -pady 3 -padx 3
-  grid $w(ButtoncOH) -columnspan 2 -pady 3
-
-  # give all extra space to the second (last) column
-  grid columnconfigure $w(FrameMain) 1 -weight 1
-
-  pack $w(Message) -side bottom -fill x -anchor s
-  pack $w(FrameButtons) -fill x -side bottom -padx 2 -pady 4 -anchor s
-  pack $w(ButtonCancel) -side right -padx 2
-  pack $w(Logo) -side left -padx 5
-
-  bind . <Key-Escape> { $w(ButtonCancel) invoke }
-  bind . <Control-Key-Return> { $w(ButtonSelect) invoke }
-  bind . <Control-Key-f> { $w(ButtoncOH) invoke }
-  bind $w(EntryExtent) <Key-Return> { $w(ButtoncOH) invoke }
-
-  # move keyboard focus to the first entry
-  focus $w(ButtonSelect)
-  raise .
-}
-
-makeWindow
+makeWindow [retrieveCons]
 
 tkwait window .
 
